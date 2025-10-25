@@ -3,6 +3,7 @@
   activate_task
   add_cpu
   add_device_randomness
+  add_memory
   addrconf_add_linklocal
   addrconf_prefix_rcv_add_addr
   add_taint
@@ -30,6 +31,7 @@
   __alloc_percpu_gfp
   __alloc_skb
   alloc_skb_with_frags
+  alloc_swapdev_block
   alloc_workqueue
   alt_cb_patch_nops
   amba_bustype
@@ -43,6 +45,7 @@
   __arch_copy_from_user
   __arch_copy_to_user
   arch_freq_scale
+  arch_invalidate_pmem
   arch_timer_read_counter
   argv_free
   argv_split
@@ -1936,6 +1939,7 @@
   mem_dump_obj
   memdup_user
   memmove
+  memory_block_size_bytes
   memory_read_from_buffer
   memparse
   mempool_alloc
@@ -1945,6 +1949,7 @@
   mempool_free
   mempool_free_slab
   memremap
+  memremap_pages
   memscan
   mem_section
   memset
@@ -1952,6 +1957,7 @@
   __memset_io
   memstart_addr
   memunmap
+  memunmap_pages
   migrate_pages
   migrate_swap
   __migrate_task
@@ -2185,6 +2191,7 @@
   of_find_node_opts_by_path
   of_find_node_with_property
   of_find_property
+  offline_and_remove_memory
   of_fwnode_ops
   of_genpd_add_provider_onecell
   of_genpd_add_provider_simple
@@ -2199,7 +2206,6 @@
   of_get_next_child
   of_get_next_parent
   of_get_parent
-  of_get_pci_domain_nr
   of_get_phy_mode
   of_get_property
   of_get_regulator_init_data
@@ -2302,11 +2308,6 @@
   pci_aer_clear_nonfatal_status
   pci_alloc_irq_vectors_affinity
   pci_assign_resource
-  pci_bus_add_device
-  pci_bus_add_devices
-  pci_bus_assign_resources
-  pci_bus_claim_resources
-  pci_bus_size_bridges
   pci_bus_type
   pci_clear_master
   pci_dev_get
@@ -2319,15 +2320,10 @@
   pcie_capability_clear_and_set_word
   pcie_capability_read_dword
   pcie_capability_read_word
-  pcie_get_width_cap
-  pci_ecam_create
-  pci_ecam_free
   pci_ecam_map_bus
   pci_enable_device
   pci_enable_pcie_error_reporting
   pci_find_ext_capability
-  pci_find_vsec_capability
-  pci_flags
   pci_free_irq_vectors
   pci_get_device
   pci_get_domain_bus_and_slot
@@ -2347,17 +2343,14 @@
   pci_release_region
   pci_request_region
   pci_restore_state
-  pci_scan_root_bus_bridge
   pci_save_state
   pci_set_master
   pci_set_power_state
-  pci_stop_and_remove_bus_device_locked
   pci_store_saved_state
   pci_unregister_driver
   pci_walk_bus
   pci_write_config_dword
   pci_write_config_word
-  pcie_bus_configure_settings
   pcpu_nr_pages
   __percpu_down_read
   percpu_down_write
@@ -2737,6 +2730,7 @@
   register_inetaddr_notifier
   register_kprobe
   register_kretprobe
+  register_memory_notifier
   register_module_notifier
   register_netdev
   register_netdevice
@@ -2806,6 +2800,7 @@
   release_sock
   remap_pfn_range
   remove_cpu
+  remove_memory
   remove_proc_entry
   remove_resource
   remove_wait_queue
@@ -3110,6 +3105,7 @@
   smp_call_function
   smp_call_function_single
   smp_call_function_single_async
+  snapshot_get_image_size
   snd_ctl_add
   snd_ctl_new1
   snd_ctl_remove
@@ -3383,6 +3379,10 @@
   time64_to_tm
   timer_unstable_counter_workaround
   timespec64_to_jiffies
+  tipc_dump_done
+  tipc_dump_start
+  tipc_nl_sk_walk
+  tipc_sk_fill_sock_diag
   topology_clear_scale_freq_source
   topology_update_done
   topology_update_thermal_pressure
@@ -3539,7 +3539,6 @@
   __traceiter_android_vh_ufs_send_uic_command
   __traceiter_android_vh_ufs_update_sdev
   __traceiter_android_vh_update_topology_flags_workfn
-  __traceiter_android_vh_vprintk_store
   __traceiter_binder_transaction_received
   __traceiter_cpu_frequency_limits
   __traceiter_cpu_idle
@@ -3693,7 +3692,6 @@
   __tracepoint_android_vh_ufs_send_uic_command
   __tracepoint_android_vh_ufs_update_sdev
   __tracepoint_android_vh_update_topology_flags_workfn
-  __tracepoint_android_vh_vprintk_store
   __tracepoint_binder_transaction_received
   __tracepoint_cpu_frequency_limits
   __tracepoint_cpu_idle
@@ -3774,6 +3772,7 @@
   uart_remove_one_port
   uart_resume_port
   uart_suspend_port
+  uart_try_toggle_sysrq
   uart_unregister_driver
   uart_update_timeout
   uart_write_wakeup
@@ -4082,7 +4081,6 @@
   virtqueue_get_buf_ctx
   virtqueue_get_desc_addr
   virtqueue_get_used_addr
-  virtqueue_get_vring
   virtqueue_get_vring_size
   virtqueue_is_broken
   virtqueue_kick
@@ -4104,8 +4102,6 @@
   vmalloc_to_page
   vmalloc_to_pfn
   vmap
-  vmap_pages_range_noflush
-  __vmap_pages_range_noflush
   vmemdup_user
   vmf_insert_mixed
   vmf_insert_pfn
@@ -4167,7 +4163,6 @@
   __xa_insert
   xa_load
   xa_store
-  xas_load
   xdp_convert_zc_to_xdp_frame
   xdp_do_flush
   xdp_do_redirect

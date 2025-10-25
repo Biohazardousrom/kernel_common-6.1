@@ -111,7 +111,7 @@ static const struct xhci_plat_priv xhci_plat_marvell_armada = {
 };
 
 static const struct xhci_plat_priv xhci_plat_marvell_armada3700 = {
-	.quirks = XHCI_RESET_ON_RESUME,
+	.init_quirk = xhci_mvebu_a3700_init_quirk,
 };
 
 static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen2 = {
@@ -219,7 +219,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	int			ret;
 	int			irq;
 	struct xhci_plat_priv	*priv = NULL;
-	const struct of_device_id *of_match;
+	bool			of_match;
 
 	if (usb_disabled())
 		return -ENODEV;
@@ -390,8 +390,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	}
 
 	usb3_hcd = xhci_get_usb3_hcd(xhci);
-	if (usb3_hcd && HCC_MAX_PSA(xhci->hcc_params) >= 4 &&
-	    !(xhci->quirks & XHCI_BROKEN_STREAMS))
+	if (usb3_hcd && HCC_MAX_PSA(xhci->hcc_params) >= 4)
 		usb3_hcd->can_do_streams = 1;
 
 	if (xhci->shared_hcd) {

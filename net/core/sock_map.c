@@ -411,7 +411,7 @@ static void *sock_map_lookup_sys(struct bpf_map *map, void *key)
 static int __sock_map_delete(struct bpf_stab *stab, struct sock *sk_test,
 			     struct sock **psk)
 {
-	struct sock *sk = NULL;
+	struct sock *sk;
 	int err = 0;
 	unsigned long flags;
 
@@ -419,8 +419,8 @@ static int __sock_map_delete(struct bpf_stab *stab, struct sock *sk_test,
 		return -EOPNOTSUPP; /* locks here are hardirq-unsafe */
 
 	raw_spin_lock_irqsave(&stab->lock, flags);
-
-	if (!sk_test || sk_test == *psk)
+	sk = *psk;
+	if (!sk_test || sk_test == sk)
 		sk = xchg(psk, NULL);
 
 	if (likely(sk))

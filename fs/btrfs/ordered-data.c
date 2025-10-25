@@ -173,10 +173,9 @@ int btrfs_add_ordered_extent(struct btrfs_inode *inode, u64 file_offset,
 	struct btrfs_ordered_extent *entry;
 	int ret;
 	u64 qgroup_rsv = 0;
-	const bool is_nocow = (flags &
-	       ((1U << BTRFS_ORDERED_NOCOW) | (1U << BTRFS_ORDERED_PREALLOC)));
 
-	if (is_nocow) {
+	if (flags &
+	    ((1 << BTRFS_ORDERED_NOCOW) | (1 << BTRFS_ORDERED_PREALLOC))) {
 		/* For nocow write, we can release the qgroup rsv right now */
 		ret = btrfs_qgroup_free_data(inode, NULL, file_offset, num_bytes, &qgroup_rsv);
 		if (ret < 0)
@@ -192,13 +191,8 @@ int btrfs_add_ordered_extent(struct btrfs_inode *inode, u64 file_offset,
 			return ret;
 	}
 	entry = kmem_cache_zalloc(btrfs_ordered_extent_cache, GFP_NOFS);
-	if (!entry) {
-		if (!is_nocow)
-			btrfs_qgroup_free_refroot(inode->root->fs_info,
-						  btrfs_root_id(inode->root),
-						  qgroup_rsv, BTRFS_QGROUP_RSV_DATA);
+	if (!entry)
 		return -ENOMEM;
-	}
 
 	entry->file_offset = file_offset;
 	entry->num_bytes = num_bytes;

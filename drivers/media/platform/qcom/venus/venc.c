@@ -406,10 +406,11 @@ static int venc_s_parm(struct file *file, void *fh, struct v4l2_streamparm *a)
 	us_per_frame = timeperframe->numerator * (u64)USEC_PER_SEC;
 	do_div(us_per_frame, timeperframe->denominator);
 
-	us_per_frame = clamp(us_per_frame, 1, USEC_PER_SEC);
+	if (!us_per_frame)
+		return -EINVAL;
+
 	fps = (u64)USEC_PER_SEC;
 	do_div(fps, us_per_frame);
-	fps = min(VENUS_MAX_FPS, fps);
 
 	inst->timeperframe = *timeperframe;
 	inst->fps = fps;
@@ -1176,7 +1177,7 @@ static int venc_verify_conf(struct venus_inst *inst)
 		return ret;
 
 	if (inst->num_output_bufs < bufreq.count_actual ||
-	    inst->num_output_bufs < hfi_bufreq_get_count_min(&bufreq, ver))
+	    inst->num_output_bufs < HFI_BUFREQ_COUNT_MIN(&bufreq, ver))
 		return -EINVAL;
 
 	ret = venus_helper_get_bufreq(inst, HFI_BUFFER_INPUT, &bufreq);
@@ -1184,7 +1185,7 @@ static int venc_verify_conf(struct venus_inst *inst)
 		return ret;
 
 	if (inst->num_input_bufs < bufreq.count_actual ||
-	    inst->num_input_bufs < hfi_bufreq_get_count_min(&bufreq, ver))
+	    inst->num_input_bufs < HFI_BUFREQ_COUNT_MIN(&bufreq, ver))
 		return -EINVAL;
 
 	return 0;

@@ -1800,10 +1800,7 @@ void cxgb4_remove_tid(struct tid_info *t, unsigned int chan, unsigned int tid,
 	struct adapter *adap = container_of(t, struct adapter, tids);
 	struct sk_buff *skb;
 
-	if (tid_out_of_range(&adap->tids, tid)) {
-		dev_err(adap->pdev_dev, "tid %d out of range\n", tid);
-		return;
-	}
+	WARN_ON(tid_out_of_range(&adap->tids, tid));
 
 	if (t->tid_tab[tid - adap->tids.tid_base]) {
 		t->tid_tab[tid - adap->tids.tid_base] = NULL;

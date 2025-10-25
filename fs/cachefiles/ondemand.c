@@ -61,34 +61,28 @@ static ssize_t cachefiles_ondemand_fd_write_iter(struct kiocb *kiocb,
 {
 	struct cachefiles_object *object = kiocb->ki_filp->private_data;
 	struct cachefiles_cache *cache = object->volume->cache;
-	struct file *file;
+	struct file *file = object->file;
 	size_t len = iter->count;
 	loff_t pos = kiocb->ki_pos;
 	const struct cred *saved_cred;
 	int ret;
 
-	spin_lock(&object->lock);
-	file = object->file;
-	if (!file) {
-		spin_unlock(&object->lock);
+	if (!file)
 		return -ENOBUFS;
-	}
-	get_file(file);
-	spin_unlock(&object->lock);
 
 	cachefiles_begin_secure(cache, &saved_cred);
 	ret = __cachefiles_prepare_write(object, file, &pos, &len, true);
 	cachefiles_end_secure(cache, saved_cred);
 	if (ret < 0)
-		goto out;
+		return ret;
 
 	trace_cachefiles_ondemand_fd_write(object, file_inode(file), pos, len);
 	ret = __cachefiles_write(object, file, pos, iter, NULL, NULL);
-	if (ret > 0)
+	if (!ret) {
+		ret = len;
 		kiocb->ki_pos += ret;
+	}
 
-out:
-	fput(file);
 	return ret;
 }
 
@@ -96,22 +90,12 @@ static loff_t cachefiles_ondemand_fd_llseek(struct file *filp, loff_t pos,
 					    int whence)
 {
 	struct cachefiles_object *object = filp->private_data;
-	struct file *file;
-	loff_t ret;
+	struct file *file = object->file;
 
-	spin_lock(&object->lock);
-	file = object->file;
-	if (!file) {
-		spin_unlock(&object->lock);
+	if (!file)
 		return -ENOBUFS;
-	}
-	get_file(file);
-	spin_unlock(&object->lock);
 
-	ret = vfs_llseek(file, pos, whence);
-	fput(file);
-
-	return ret;
+	return vfs_llseek(file, pos, whence);
 }
 
 static long cachefiles_ondemand_fd_ioctl(struct file *filp, unsigned int ioctl,

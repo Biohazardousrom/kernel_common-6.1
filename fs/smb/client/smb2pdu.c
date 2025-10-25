@@ -1070,9 +1070,7 @@ SMB2_negotiate(const unsigned int xid,
 	 * SMB3.0 supports only 1 cipher and doesn't have a encryption neg context
 	 * Set the cipher type manually.
 	 */
-	if ((server->dialect == SMB30_PROT_ID ||
-	     server->dialect == SMB302_PROT_ID) &&
-	    (server->capabilities & SMB2_GLOBAL_CAP_ENCRYPTION))
+	if (server->dialect == SMB30_PROT_ID && (server->capabilities & SMB2_GLOBAL_CAP_ENCRYPTION))
 		server->cipher_type = SMB2_ENCRYPTION_AES128_CCM;
 
 	security_blob = smb2_get_data_area_len(&blob_offset, &blob_length,
@@ -1106,12 +1104,6 @@ SMB2_negotiate(const unsigned int xid,
 						       rsp_iov.iov_len);
 		else
 			cifs_server_dbg(VFS, "Missing expected negotiate contexts\n");
-	}
-
-	if (server->cipher_type && !rc) {
-		rc = smb3_crypto_aead_allocate(server);
-		if (rc)
-			cifs_server_dbg(VFS, "%s: crypto alloc failed, rc=%d\n", __func__, rc);
 	}
 neg_exit:
 	free_rsp_buf(resp_buftype, rsp);
@@ -1270,7 +1262,7 @@ smb2_select_sectype(struct TCP_Server_Info *server, enum securityEnum requested)
 		if (server->sec_ntlmssp &&
 			(global_secflags & CIFSSEC_MAY_NTLMSSP))
 			return RawNTLMSSP;
-		if ((server->sec_kerberos || server->sec_mskerberos || server->sec_iakerb) &&
+		if ((server->sec_kerberos || server->sec_mskerberos) &&
 			(global_secflags & CIFSSEC_MAY_KRB5))
 			return Kerberos;
 		fallthrough;
@@ -1999,7 +1991,7 @@ tcon_exit:
 
 tcon_error_exit:
 	if (rsp && rsp->hdr.Status == STATUS_BAD_NETWORK_NAME)
-		cifs_dbg(VFS | ONCE, "BAD_NETWORK_NAME: %s\n", tree);
+		cifs_tcon_dbg(VFS, "BAD_NETWORK_NAME: %s\n", tree);
 	goto tcon_exit;
 }
 
@@ -2158,7 +2150,7 @@ parse_posix_ctxt(struct create_context *cc, struct smb2_file_all_info *info,
 
 int smb2_parse_contexts(struct TCP_Server_Info *server,
 			struct kvec *rsp_iov,
-			__u16 *epoch,
+			unsigned int *epoch,
 			char *lease_key, __u8 *oplock,
 			struct smb2_file_all_info *buf,
 			struct create_posix_rsp *posix)
@@ -2826,7 +2818,7 @@ int smb311_posix_mkdir(const unsigned int xid, struct inode *inode,
 	/* Eventually save off posix specific response info and timestaps */
 
 err_free_rsp_buf:
-	free_rsp_buf(resp_buftype, rsp_iov.iov_base);
+	free_rsp_buf(resp_buftype, rsp);
 	kfree(pc_buf);
 err_free_req:
 	cifs_small_buf_release(req);

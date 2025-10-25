@@ -377,7 +377,7 @@ coalesce_t2(char *second_buf, struct smb_hdr *target_hdr)
 static void
 cifs_downgrade_oplock(struct TCP_Server_Info *server,
 		      struct cifsInodeInfo *cinode, __u32 oplock,
-		      __u16 epoch, bool *purge_cache)
+		      unsigned int epoch, bool *purge_cache)
 {
 	cifs_set_oplock_level(cinode, oplock);
 }
@@ -426,6 +426,13 @@ cifs_negotiate(const unsigned int xid,
 {
 	int rc;
 	rc = CIFSSMBNegotiate(xid, ses, server);
+	if (rc == -EAGAIN) {
+		/* retry only once on 1st time connection */
+		set_credits(server, 1);
+		rc = CIFSSMBNegotiate(xid, ses, server);
+		if (rc == -EAGAIN)
+			rc = -EHOSTDOWN;
+	}
 	return rc;
 }
 

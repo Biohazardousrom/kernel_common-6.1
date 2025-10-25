@@ -212,36 +212,24 @@ BPF_CALL_3(bpf_skb_get_nlattr_nest, struct sk_buff *, skb, u32, a, u32, x)
 	return 0;
 }
 
-static int bpf_skb_load_helper_convert_offset(const struct sk_buff *skb, int offset)
-{
-	if (likely(offset >= 0))
-		return offset;
-
-	if (offset >= SKF_NET_OFF)
-		return offset - SKF_NET_OFF + skb_network_offset(skb);
-
-	if (offset >= SKF_LL_OFF && skb_mac_header_was_set(skb))
-		return offset - SKF_LL_OFF + skb_mac_offset(skb);
-
-	return INT_MIN;
-}
-
 BPF_CALL_4(bpf_skb_load_helper_8, const struct sk_buff *, skb, const void *,
 	   data, int, headlen, int, offset)
 {
-	u8 tmp;
+	u8 tmp, *ptr;
 	const int len = sizeof(tmp);
 
-	offset = bpf_skb_load_helper_convert_offset(skb, offset);
-	if (offset == INT_MIN)
-		return -EFAULT;
+	if (offset >= 0) {
+		if (headlen - offset >= len)
+			return *(u8 *)(data + offset);
+		if (!skb_copy_bits(skb, offset, &tmp, sizeof(tmp)))
+			return tmp;
+	} else {
+		ptr = bpf_internal_load_pointer_neg_helper(skb, offset, len);
+		if (likely(ptr))
+			return *(u8 *)ptr;
+	}
 
-	if (headlen - offset >= len)
-		return *(u8 *)(data + offset);
-	if (!skb_copy_bits(skb, offset, &tmp, sizeof(tmp)))
-		return tmp;
-	else
-		return -EFAULT;
+	return -EFAULT;
 }
 
 BPF_CALL_2(bpf_skb_load_helper_8_no_cache, const struct sk_buff *, skb,
@@ -254,19 +242,21 @@ BPF_CALL_2(bpf_skb_load_helper_8_no_cache, const struct sk_buff *, skb,
 BPF_CALL_4(bpf_skb_load_helper_16, const struct sk_buff *, skb, const void *,
 	   data, int, headlen, int, offset)
 {
-	__be16 tmp;
+	__be16 tmp, *ptr;
 	const int len = sizeof(tmp);
 
-	offset = bpf_skb_load_helper_convert_offset(skb, offset);
-	if (offset == INT_MIN)
-		return -EFAULT;
+	if (offset >= 0) {
+		if (headlen - offset >= len)
+			return get_unaligned_be16(data + offset);
+		if (!skb_copy_bits(skb, offset, &tmp, sizeof(tmp)))
+			return be16_to_cpu(tmp);
+	} else {
+		ptr = bpf_internal_load_pointer_neg_helper(skb, offset, len);
+		if (likely(ptr))
+			return get_unaligned_be16(ptr);
+	}
 
-	if (headlen - offset >= len)
-		return get_unaligned_be16(data + offset);
-	if (!skb_copy_bits(skb, offset, &tmp, sizeof(tmp)))
-		return be16_to_cpu(tmp);
-	else
-		return -EFAULT;
+	return -EFAULT;
 }
 
 BPF_CALL_2(bpf_skb_load_helper_16_no_cache, const struct sk_buff *, skb,
@@ -279,19 +269,21 @@ BPF_CALL_2(bpf_skb_load_helper_16_no_cache, const struct sk_buff *, skb,
 BPF_CALL_4(bpf_skb_load_helper_32, const struct sk_buff *, skb, const void *,
 	   data, int, headlen, int, offset)
 {
-	__be32 tmp;
+	__be32 tmp, *ptr;
 	const int len = sizeof(tmp);
 
-	offset = bpf_skb_load_helper_convert_offset(skb, offset);
-	if (offset == INT_MIN)
-		return -EFAULT;
+	if (likely(offset >= 0)) {
+		if (headlen - offset >= len)
+			return get_unaligned_be32(data + offset);
+		if (!skb_copy_bits(skb, offset, &tmp, sizeof(tmp)))
+			return be32_to_cpu(tmp);
+	} else {
+		ptr = bpf_internal_load_pointer_neg_helper(skb, offset, len);
+		if (likely(ptr))
+			return get_unaligned_be32(ptr);
+	}
 
-	if (headlen - offset >= len)
-		return get_unaligned_be32(data + offset);
-	if (!skb_copy_bits(skb, offset, &tmp, sizeof(tmp)))
-		return be32_to_cpu(tmp);
-	else
-		return -EFAULT;
+	return -EFAULT;
 }
 
 BPF_CALL_2(bpf_skb_load_helper_32_no_cache, const struct sk_buff *, skb,
@@ -1958,11 +1950,10 @@ BPF_CALL_5(bpf_l4_csum_replace, struct sk_buff *, skb, u32, offset,
 	bool is_pseudo = flags & BPF_F_PSEUDO_HDR;
 	bool is_mmzero = flags & BPF_F_MARK_MANGLED_0;
 	bool do_mforce = flags & BPF_F_MARK_ENFORCE;
-	bool is_ipv6   = flags & BPF_F_IPV6;
 	__sum16 *ptr;
 
 	if (unlikely(flags & ~(BPF_F_MARK_MANGLED_0 | BPF_F_MARK_ENFORCE |
-			       BPF_F_PSEUDO_HDR | BPF_F_HDR_FIELD_MASK | BPF_F_IPV6)))
+			       BPF_F_PSEUDO_HDR | BPF_F_HDR_FIELD_MASK)))
 		return -EINVAL;
 	if (unlikely(offset > 0xffff || offset & 1))
 		return -EFAULT;
@@ -1978,7 +1969,7 @@ BPF_CALL_5(bpf_l4_csum_replace, struct sk_buff *, skb, u32, offset,
 		if (unlikely(from != 0))
 			return -EINVAL;
 
-		inet_proto_csum_replace_by_diff(ptr, skb, to, is_pseudo, is_ipv6);
+		inet_proto_csum_replace_by_diff(ptr, skb, to, is_pseudo);
 		break;
 	case 2:
 		inet_proto_csum_replace2(ptr, skb, from, to, is_pseudo);
@@ -2500,7 +2491,6 @@ int skb_do_redirect(struct sk_buff *skb)
 			     net_eq(net, dev_net(dev))))
 			goto out_drop;
 		skb->dev = dev;
-		skb_scrub_packet(skb, false);
 		return -EAGAIN;
 	}
 	return flags & BPF_F_NEIGH ?
@@ -9267,9 +9257,6 @@ static bool flow_dissector_is_valid_access(int off, int size,
 	if (off < 0 || off >= sizeof(struct __sk_buff))
 		return false;
 
-	if (off % size != 0)
-		return false;
-
 	if (type == BPF_WRITE)
 		return false;
 
@@ -11119,7 +11106,6 @@ BPF_CALL_4(sk_select_reuseport, struct sk_reuseport_kern *, reuse_kern,
 	bool is_sockarray = map->map_type == BPF_MAP_TYPE_REUSEPORT_SOCKARRAY;
 	struct sock_reuseport *reuse;
 	struct sock *selected_sk;
-	int err;
 
 	selected_sk = map->ops->map_lookup_elem(map, key);
 	if (!selected_sk)
@@ -11127,6 +11113,10 @@ BPF_CALL_4(sk_select_reuseport, struct sk_reuseport_kern *, reuse_kern,
 
 	reuse = rcu_dereference(selected_sk->sk_reuseport_cb);
 	if (!reuse) {
+		/* Lookup in sock_map can return TCP ESTABLISHED sockets. */
+		if (sk_is_refcounted(selected_sk))
+			sock_put(selected_sk);
+
 		/* reuseport_array has only sk with non NULL sk_reuseport_cb.
 		 * The only (!reuse) case here is - the sk has already been
 		 * unhashed (e.g. by close()), so treat it as -ENOENT.
@@ -11134,33 +11124,24 @@ BPF_CALL_4(sk_select_reuseport, struct sk_reuseport_kern *, reuse_kern,
 		 * Other maps (e.g. sock_map) do not provide this guarantee and
 		 * the sk may never be in the reuseport group to begin with.
 		 */
-		err = is_sockarray ? -ENOENT : -EINVAL;
-		goto error;
+		return is_sockarray ? -ENOENT : -EINVAL;
 	}
 
 	if (unlikely(reuse->reuseport_id != reuse_kern->reuseport_id)) {
 		struct sock *sk = reuse_kern->sk;
 
-		if (sk->sk_protocol != selected_sk->sk_protocol) {
-			err = -EPROTOTYPE;
-		} else if (sk->sk_family != selected_sk->sk_family) {
-			err = -EAFNOSUPPORT;
-		} else {
-			/* Catch all. Likely bound to a different sockaddr. */
-			err = -EBADFD;
-		}
-		goto error;
+		if (sk->sk_protocol != selected_sk->sk_protocol)
+			return -EPROTOTYPE;
+		else if (sk->sk_family != selected_sk->sk_family)
+			return -EAFNOSUPPORT;
+
+		/* Catch all. Likely bound to a different sockaddr. */
+		return -EBADFD;
 	}
 
 	reuse_kern->selected_sk = selected_sk;
 
 	return 0;
-error:
-	/* Lookup in sock_map can return TCP ESTABLISHED sockets. */
-	if (sk_is_refcounted(selected_sk))
-		sock_put(selected_sk);
-
-	return err;
 }
 
 static const struct bpf_func_proto sk_select_reuseport_proto = {

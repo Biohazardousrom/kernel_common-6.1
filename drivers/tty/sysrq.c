@@ -91,7 +91,8 @@ static bool sysrq_on_mask(int mask)
 
 static int __init sysrq_always_enabled_setup(char *str)
 {
-	pr_info("sysrq always enabled ignored.\n");
+	sysrq_always_enabled = true;
+	pr_info("sysrq always enabled.\n");
 
 	return 1;
 }

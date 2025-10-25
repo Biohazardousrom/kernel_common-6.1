@@ -560,7 +560,7 @@ static enum vchiq_status service_callback(struct vchiq_instance *vchiq_instance,
 
 	if (!instance) {
 		pr_err("Message callback passed NULL instance\n");
-		return 0;
+		return VCHIQ_SUCCESS;
 	}
 
 	switch (reason) {
@@ -644,7 +644,7 @@ static enum vchiq_status service_callback(struct vchiq_instance *vchiq_instance,
 		break;
 	}
 
-	return 0;
+	return VCHIQ_SUCCESS;
 }
 
 static int send_synchronous_mmal_msg(struct vchiq_mmal_instance *instance,

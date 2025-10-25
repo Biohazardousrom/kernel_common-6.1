@@ -1891,7 +1891,9 @@ xlog_write_iclog(
 		 * the buffer manually, the code needs to be kept in sync
 		 * with the I/O completion path.
 		 */
-		goto sync;
+		xlog_state_done_syncing(iclog);
+		up(&iclog->ic_sema);
+		return;
 	}
 
 	/*
@@ -1921,17 +1923,20 @@ xlog_write_iclog(
 		 * avoid shutdown re-entering this path and erroring out again.
 		 */
 		if (log->l_targ != log->l_mp->m_ddev_targp &&
-		    blkdev_issue_flush(log->l_mp->m_ddev_targp->bt_bdev))
-			goto shutdown;
+		    blkdev_issue_flush(log->l_mp->m_ddev_targp->bt_bdev)) {
+			xlog_force_shutdown(log, SHUTDOWN_LOG_IO_ERROR);
+			return;
+		}
 	}
 	if (iclog->ic_flags & XLOG_ICL_NEED_FUA)
 		iclog->ic_bio.bi_opf |= REQ_FUA;
 
 	iclog->ic_flags &= ~(XLOG_ICL_NEED_FLUSH | XLOG_ICL_NEED_FUA);
 
-	if (xlog_map_iclog_data(&iclog->ic_bio, iclog->ic_data, count))
-		goto shutdown;
-
+	if (xlog_map_iclog_data(&iclog->ic_bio, iclog->ic_data, count)) {
+		xlog_force_shutdown(log, SHUTDOWN_LOG_IO_ERROR);
+		return;
+	}
 	if (is_vmalloc_addr(iclog->ic_data))
 		flush_kernel_vmap_range(iclog->ic_data, count);
 
@@ -1952,12 +1957,6 @@ xlog_write_iclog(
 	}
 
 	submit_bio(&iclog->ic_bio);
-	return;
-shutdown:
-	xlog_force_shutdown(log, SHUTDOWN_LOG_IO_ERROR);
-sync:
-	xlog_state_done_syncing(iclog);
-	up(&iclog->ic_sema);
 }
 
 /*

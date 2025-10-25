@@ -1140,6 +1140,7 @@ void page_move_anon_rmap(struct page *page, struct vm_area_struct *vma)
 	 * folio_test_anon()) will not see one without the other.
 	 */
 	WRITE_ONCE(folio->mapping, anon_vma);
+	SetPageAnonExclusive(page);
 }
 
 /**
@@ -2337,7 +2338,7 @@ static bool folio_make_device_exclusive(struct folio *folio,
 	 * Restrict to anonymous folios for now to avoid potential writeback
 	 * issues.
 	 */
-	if (!folio_test_anon(folio) || folio_test_hugetlb(folio))
+	if (!folio_test_anon(folio))
 		return false;
 
 	rmap_walk(folio, &rwc);
